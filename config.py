@@ -9,12 +9,20 @@ INTERVAL_TOLERANCE_DAYS = 2
 
 # пороги для статусов
 PRICE_RISE_THRESHOLD_PERCENT = 20
-UNUSED_MONTHLY_DAYS = 60
-UNUSED_YEARLY_DAYS = 330  # примерно 11 месяцев
 
 # дата
 SIMULATED_CURRENT_DATE = None
 
+# шанс появления "лишних" подписок
+UNUSED_PROBABILITY = 0.5
+UNUSED_MONTHLY_DAYS = 30
+UNUSED_YEARLY_DAYS = 180
+MIN_SUBSCRIPTION_AMOUNT = 50
+MAX_CV_FOR_SUBSCRIPTION = 0.3
+
+# для специальных подписок
+TRIAL_PROBABILITY = 0.7
+PRICE_RISE_PROBABILITY = 0.7
 # справочник: сервис - категория
 MERCHANT_CATEGORIES = {
     # музыка
@@ -172,5 +180,12 @@ POPULAR_SERVICES = [
 ]
 
 # допы
-NUM_MONTHS_HISTORY = 6
+NUM_MONTHS_HISTORY = 12
 RANDOM_SEED = 42
+
+# не являются подписками (даже если частые)
+BLACKLIST_MERCHANTS = [
+    "Перекрёсток", "Яндекс.Такси", "Starbucks", "Ozon", "Аптека",
+    "Макдоналдс", "АЗС", "Пятёрочка", "Магнит", "ВкусВилл",
+    "Delivery Club", "Яндекс.Еда", "СберМаркет", "KFC", "Burger King"
+]

@@ -1,140 +1,114 @@
-from config import POPULAR_SERVICES, NUM_MONTHS_HISTORY, RANDOM_SEED
-import pandas as pd
-import numpy as np
-from datetime import datetime, timedelta
-import random
 from faker import Faker
-
-# импорт из config
+import random
+from datetime import datetime, timedelta
+import numpy as np
+import pandas as pd
+from config import (
+    POPULAR_SERVICES, NUM_MONTHS_HISTORY, RANDOM_SEED, BLACKLIST_MERCHANTS,
+    UNUSED_PROBABILITY, UNUSED_MONTHLY_DAYS,
+    TRIAL_PROBABILITY, PRICE_RISE_PROBABILITY
+)
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 fake = Faker()
 random.seed(RANDOM_SEED)
 np.random.seed(RANDOM_SEED)
 
 
-def generate_user_transactions(num_months=NUM_MONTHS_HISTORY):
-    """
-    Генерирует DataFrame с транзакциями пользователя за последние num_months месяцев.
-
-    Возвращает:
-        pd.DataFrame с колонками: date, merchant_name, amount, transaction_id
-    """
+def generate_user_transactions(num_months=NUM_MONTHS_HISTORY, user_id=0):
     end_date = datetime.now().date()
     start_date = end_date - timedelta(days=num_months * 30)
 
     transactions = []
     transaction_counter = 0
 
-    # берем случайные 3-6 подписок
-    num_subscriptions = random.randint(3, 6)
-    selected_services = random.sample(POPULAR_SERVICES, num_subscriptions)
+    available_services = [
+        s for s in POPULAR_SERVICES if s['name'] not in BLACKLIST_MERCHANTS]
+    num_subs = random.randint(4, 8)
+    selected = random.sample(available_services, min(
+        num_subs, len(available_services)))
 
-    # для одной из подписок "рост цены" через 3 месяца
-    price_rise_service = random.choice(selected_services)
-    # для другой пробный период
-    trial_services = [s for s in selected_services if s != price_rise_service]
-    trial_service = random.choice(trial_services) if trial_services else None
-
-    # для каждой - транзакция
-    for service in selected_services:
+    for service in selected:
         merchant = service["name"]
         base_amount = service["amount"]
-        period = service["period"]  # "monthly", "yearly", "weekly"
+        period = service["period"]
 
-        # считаем в днях
+        has_trial = random.random() < TRIAL_PROBABILITY
+        has_price_rise = random.random() < PRICE_RISE_PROBABILITY
+
+        is_unused = random.random() < UNUSED_PROBABILITY
+
         if period == "monthly":
             interval_days = random.randint(28, 31)
         elif period == "yearly":
             interval_days = 365
-        else:  # weekly
+        else:
             interval_days = 7
 
-        # первая возможная дата транзакции - не ранее start_date
-        # каждые interval_days, начиная с даты, которая попадает в диапазон
-        # сгенерируем список дат от start_date до end_date с шагом interval_days
-        current_date = start_date
         dates = []
         amounts = []
-
-        # пробный период: первый платёж = 0
-        is_trial = (service == trial_service)
-        trial_applied = False
-
-        # рост цены: после определённой даты сумма увеличивается
-        price_rise_date = None
-        if service == price_rise_service:
-
-            pass
-
-        # даты
+        current = start_date
         first_date = None
-        while current_date <= end_date:
-            # оставляем хотя бы одну транзакцию
-            if current_date >= start_date:
-                dates.append(current_date)
-                # если пробный период и ещё не было платежа
-                if is_trial and not trial_applied:
-                    amount = 0.0
-                    trial_applied = True  # первый платёж нулевой
-                else:
-                    amount = base_amount
-                    # если установлена дата роста и текущая дата >= дата роста
-                    if service == price_rise_service and price_rise_date and current_date >= price_rise_date:
-                        amount = base_amount * 1.25  # +25%
-                amounts.append(round(amount, 2))
+
+        while current <= end_date:
+            if current >= start_date:
+                dates.append(current)
                 if first_date is None:
-                    first_date = current_date
-            current_date += timedelta(days=interval_days)
+                    first_date = current
+            current += timedelta(days=interval_days)
 
-        # если рост, дата роста = first_date + 3 месяца
-        if service == price_rise_service and first_date:
-            price_rise_date = first_date + \
-                timedelta(days=90)  # примерно 3 месяца
-            # считаем суммы для всех транзакций после этой даты
-            for i, d in enumerate(dates):
-                if d >= price_rise_date:
-                    amounts[i] = round(base_amount * 1.25, 2)
+        price_rise_date = None
+        if has_price_rise and first_date:
+            price_rise_date = first_date + timedelta(days=30)
 
-        # + транзакции
-        for date, amount in zip(dates, amounts):
+        cutoff_date = end_date - timedelta(days=UNUSED_MONTHLY_DAYS)
+        if is_unused:
+            dates = [d for d in dates if d <= cutoff_date]
+
+        trial_applied = False
+        for d in dates:
+            if has_trial and not trial_applied:
+                amount = 0.0
+                trial_applied = True
+            else:
+                amount = base_amount
+                if has_price_rise and price_rise_date and d >= price_rise_date:
+                    amount = base_amount * 1.25
+            amounts.append(round(amount, 2))
+
+        for d, am in zip(dates, amounts):
             transaction_counter += 1
             transactions.append({
-                "date": date,
+                "date": d,
                 "merchant_name": merchant,
-                "amount": amount,
-                "transaction_id": f"tx_{transaction_counter}"
+                "amount": am,
+                "transaction_id": f"tx_{user_id}_{transaction_counter}"
             })
 
-    # нерегулярные платежи
     num_noise = random.randint(10, 15)
-    noise_merchants = ["Перекрёсток", "Яндекс.Такси",
-                       "Starbucks", "Ozon", "Аптека", "Макдоналдс", "АЗС"]
     for _ in range(num_noise):
-        date = fake.date_between(start_date=start_date, end_date=end_date)
-        merchant = random.choice(noise_merchants)
+        date_noise = fake.date_between(
+            start_date=start_date, end_date=end_date)
+        merchant = random.choice(BLACKLIST_MERCHANTS)
         amount = round(random.uniform(50, 5000), 2)
         transaction_counter += 1
         transactions.append({
-            "date": date,
+            "date": date_noise,
             "merchant_name": merchant,
             "amount": amount,
-            "transaction_id": f"tx_{transaction_counter}"
+            "transaction_id": f"tx_{user_id}_{transaction_counter}"
         })
 
-    # создаем данные и сортируем по дате
     df = pd.DataFrame(transactions)
     df['date'] = pd.to_datetime(df['date'])
     df = df.sort_values('date').reset_index(drop=True)
-
     return df
 
 
-# для проверки
-if __name__ == "__main__":
-    df_test = generate_user_transactions(6)
-    print(df_test.head(10))
-    print(f"\nВсего транзакций: {len(df_test)}")
-    print("Уникальные merchant:", df_test['merchant_name'].unique())
+def generate_all_users_transactions(num_users=100):
+    users_data = {}
+    for uid in range(num_users):
+        users_data[uid] = generate_user_transactions(NUM_MONTHS_HISTORY, uid)
+    return users_data

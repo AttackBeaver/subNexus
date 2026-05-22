@@ -1,11 +1,8 @@
 from config import (
-    WEEKLY_INTERVAL_DAYS,
-    MONTHLY_INTERVAL_MIN,
-    MONTHLY_INTERVAL_MAX,
-    YEARLY_INTERVAL_DAYS,
-    INTERVAL_TOLERANCE_DAYS,
-    MIN_MONTHLY_OCCURRENCES,
-    MIN_YEARLY_OCCURRENCES
+    WEEKLY_INTERVAL_DAYS, MONTHLY_INTERVAL_MIN, MONTHLY_INTERVAL_MAX,
+    YEARLY_INTERVAL_DAYS, INTERVAL_TOLERANCE_DAYS,
+    MIN_MONTHLY_OCCURRENCES, MIN_YEARLY_OCCURRENCES,
+    BLACKLIST_MERCHANTS, MIN_SUBSCRIPTION_AMOUNT, MAX_CV_FOR_SUBSCRIPTION
 )
 from datetime import timedelta
 import numpy as np
@@ -16,48 +13,36 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 def detect_subscriptions(transactions_df):
-    """
-    Автоматически находит подписки в истории транзакций.
-
-    Параметры:
-        transactions_df (pd.DataFrame): date, merchant_name, amount, transaction_id
-
-    Возвращает:
-        pd.DataFrame:
-            merchant_name, amount (медианная сумма), period_days,
-            last_payment_date, next_payment_date, first_payment_date
-    """
     if transactions_df.empty:
         return pd.DataFrame(columns=[
             "merchant_name", "amount", "period_days",
             "last_payment_date", "next_payment_date", "first_payment_date"
         ])
 
-    # по продавцу
     grouped = transactions_df.groupby("merchant_name")
     subscriptions = []
 
     for merchant, group in grouped:
-        # по дате
+        if merchant in BLACKLIST_MERCHANTS:
+            continue
+
         group = group.sort_values("date")
         dates = group["date"].values
         amounts = group["amount"].values
         n = len(dates)
-
         if n < 2:
-            continue  # минимум 2 платежа
+            continue
 
-        # интервалы между последовательными платежами (в днях)
+        median_amount = np.median(amounts)
+        if median_amount < MIN_SUBSCRIPTION_AMOUNT and all(a == 0 for a in amounts):
+            continue
+
         intervals = []
         for i in range(1, n):
             delta = (dates[i] - dates[i-1]) / np.timedelta64(1, 'D')
             intervals.append(int(delta))
 
-        # подходит ли под одну из типовых периодичностей
-        #    с учётом допуска INTERVAL_TOLERANCE_DAYS
-        #    медианный интервал и проверяем, попадает ли он в один из диапазонов
         median_interval = int(np.median(intervals))
-
         is_weekly = abs(median_interval -
                         WEEKLY_INTERVAL_DAYS) <= INTERVAL_TOLERANCE_DAYS
         is_monthly = (MONTHLY_INTERVAL_MIN <=
@@ -73,26 +58,17 @@ def detect_subscriptions(transactions_df):
         elif is_yearly:
             period_days = YEARLY_INTERVAL_DAYS
         else:
-            # если не подходит - пропускаем
             continue
 
-        # минимальное количество повторений
-        required_occurrences = MIN_MONTHLY_OCCURRENCES
-        if is_yearly:
-            required_occurrences = MIN_YEARLY_OCCURRENCES
-        # weekly/monthly используем MIN_MONTHLY_OCCURRENCES (3)
-        if n < required_occurrences:
+        required = MIN_MONTHLY_OCCURRENCES if not is_yearly else MIN_YEARLY_OCCURRENCES
+        if n < required:
             continue
 
-        # медианная сумма (пробный 0 или рост цены)
-        median_amount = np.median(amounts)
-
-        # последняя дата платежа и первая
         last_date = dates[-1]
         first_date = dates[0]
-
-        # следующая дата платежа (последняя + period_days)
         next_date = last_date + timedelta(days=period_days)
+
+        median_amount = np.median(amounts)
 
         subscriptions.append({
             "merchant_name": merchant,
@@ -105,20 +81,3 @@ def detect_subscriptions(transactions_df):
 
     result_df = pd.DataFrame(subscriptions)
     return result_df
-
-
-# тест
-if __name__ == "__main__":
-    # импорт data_generator
-    from modules.data_generator import generate_user_transactions
-
-    # тестовые данные
-    df_trans = generate_user_transactions(6)
-    print("Сгенерировано транзакций:", len(df_trans))
-    print("Пример транзакций:")
-    print(df_trans.head(10))
-
-    # детектор
-    subs_df = detect_subscriptions(df_trans)
-    print("\nОбнаруженные подписки:")
-    print(subs_df.to_string())
