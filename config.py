@@ -1,4 +1,4 @@
-# Пороги детекции
+# пороги детекции
 MIN_MONTHLY_OCCURRENCES = 3
 MIN_YEARLY_OCCURRENCES = 2
 WEEKLY_INTERVAL_DAYS = 7
@@ -7,38 +7,170 @@ MONTHLY_INTERVAL_MAX = 31
 YEARLY_INTERVAL_DAYS = 365
 INTERVAL_TOLERANCE_DAYS = 2
 
-# Пороги для статусов
+# пороги для статусов
 PRICE_RISE_THRESHOLD_PERCENT = 20
 UNUSED_MONTHLY_DAYS = 60
 UNUSED_YEARLY_DAYS = 330  # примерно 11 месяцев
 
-# Дата
+# дата
 SIMULATED_CURRENT_DATE = None
 
-# Справочник: сервис - категория
+# справочник: сервис - категория
 MERCHANT_CATEGORIES = {
+    # музыка
     "Яндекс.Музыка": "Музыка",
-    "Netflix": "Видео",
-    "IVI": "Видео",
-    "Apple iCloud": "Хранилище",
-    "Skillbox": "Образование",
+    "VK Музыка": "Музыка",
     "Spotify": "Музыка",
-    "Amazon Prime": "Видео",
+    "Zvuk": "Музыка",
+    "YouTube Music": "Музыка",
+    "Boom": "Музыка",
+
+    # видео
+    "Кинопоиск": "Видео",
+    "IVI": "Видео",
+    "Okko": "Видео",
+    "START": "Видео",
+    "Wink": "Видео",
+    "Premier": "Видео",
+    "Netflix": "Видео",
+    "Amediateka": "Видео",
+    "KION": "Видео",
+    "YouTube Premium": "Видео",
+
+    # облако / хранилище
+    "Яндекс 360": "Хранилище",
     "Google Drive": "Хранилище",
+    "Apple iCloud": "Хранилище",
+    "Dropbox": "Хранилище",
+    "OneDrive": "Хранилище",
+    "Mail Cloud": "Хранилище",
+
+    # образование
+    "Skillbox": "Образование",
+    "GeekBrains": "Образование",
+    "Skyeng": "Образование",
+    "Нетология": "Образование",
+    "Stepik": "Образование",
+    "Яндекс Практикум": "Образование",
+    "Uchi.ru": "Образование",
+
+    # игры
+    "Steam": "Игры",
+    "Xbox Game Pass": "Игры",
+    "PlayStation Plus": "Игры",
+    "VK Play": "Игры",
+    "Battle.net": "Игры",
+
+    # доставка
+    "Яндекс Плюс": "Доставка",
+    "Самокат+": "Доставка",
+    "Ozon Premium": "Доставка",
+    "Wildberries Plus": "Доставка",
+    "СберПрайм": "Доставка",
+
+    # soft
+    "ChatGPT Plus": "Software",
+    "Notion": "Software",
+    "Canva Pro": "Software",
+    "Adobe Creative Cloud": "Software",
+    "Microsoft 365": "Software",
+    "Miro": "Software",
+
+    # VPN / безопаность
+    "Kaspersky Plus": "Безопасность",
+    "Dr.Web": "Безопасность",
+    "NordVPN": "VPN",
+    "Surfshark": "VPN",
+
+    # книги
+    "ЛитРес": "Книги",
+    "MyBook": "Книги",
+    "Bookmate": "Книги",
+
+    # спорт / здоровье
+    "FitStars": "Фитнес",
+    "World Class": "Фитнес",
+    "Ясно": "Здоровье",
 }
 
-# Популярные сервисы
+# популярные сервисы
 POPULAR_SERVICES = [
+    # музыка
     {"name": "Яндекс.Музыка", "amount": 299, "period": "monthly"},
-    {"name": "Netflix", "amount": 799, "period": "monthly"},
-    {"name": "IVI", "amount": 199, "period": "monthly"},
-    {"name": "Apple iCloud", "amount": 149, "period": "monthly"},
-    {"name": "Skillbox", "amount": 1490, "period": "monthly"},
+    {"name": "VK Музыка", "amount": 169, "period": "monthly"},
     {"name": "Spotify", "amount": 189, "period": "monthly"},
-    {"name": "Amazon Prime", "amount": 499, "period": "yearly"},
+    {"name": "Zvuk", "amount": 199, "period": "monthly"},
+    {"name": "YouTube Music", "amount": 299, "period": "monthly"},
+    {"name": "Boom", "amount": 169, "period": "monthly"},
+
+    # видео
+    {"name": "Кинопоиск", "amount": 399, "period": "monthly"},
+    {"name": "IVI", "amount": 199, "period": "monthly"},
+    {"name": "Okko", "amount": 399, "period": "monthly"},
+    {"name": "START", "amount": 399, "period": "monthly"},
+    {"name": "Wink", "amount": 299, "period": "monthly"},
+    {"name": "Premier", "amount": 299, "period": "monthly"},
+    {"name": "Netflix", "amount": 799, "period": "monthly"},
+    {"name": "Amediateka", "amount": 599, "period": "monthly"},
+    {"name": "KION", "amount": 249, "period": "monthly"},
+    {"name": "YouTube Premium", "amount": 299, "period": "monthly"},
+
+    # облако
+    {"name": "Яндекс 360", "amount": 249, "period": "monthly"},
     {"name": "Google Drive", "amount": 99, "period": "monthly"},
+    {"name": "Apple iCloud", "amount": 149, "period": "monthly"},
+    {"name": "Dropbox", "amount": 990, "period": "monthly"},
+    {"name": "OneDrive", "amount": 499, "period": "monthly"},
+    {"name": "Mail Cloud", "amount": 199, "period": "monthly"},
+
+    # образование
+    {"name": "Skillbox", "amount": 1490, "period": "monthly"},
+    {"name": "GeekBrains", "amount": 1290, "period": "monthly"},
+    {"name": "Skyeng", "amount": 2990, "period": "monthly"},
+    {"name": "Нетология", "amount": 1990, "period": "monthly"},
+    {"name": "Stepik", "amount": 499, "period": "monthly"},
+    {"name": "Яндекс Практикум", "amount": 3990, "period": "monthly"},
+    {"name": "Uchi.ru", "amount": 490, "period": "monthly"},
+
+    # игры
+    {"name": "Steam", "amount": 699, "period": "monthly"},
+    {"name": "Xbox Game Pass", "amount": 899, "period": "monthly"},
+    {"name": "PlayStation Plus", "amount": 3299, "period": "yearly"},
+    {"name": "VK Play", "amount": 399, "period": "monthly"},
+    {"name": "Battle.net", "amount": 599, "period": "monthly"},
+
+    # доставка
+    {"name": "Яндекс Плюс", "amount": 399, "period": "monthly"},
+    {"name": "Самокат+", "amount": 199, "period": "monthly"},
+    {"name": "Ozon Premium", "amount": 199, "period": "monthly"},
+    {"name": "Wildberries Plus", "amount": 149, "period": "monthly"},
+    {"name": "СберПрайм", "amount": 399, "period": "monthly"},
+
+    # soft
+    {"name": "ChatGPT Plus", "amount": 2000, "period": "monthly"},
+    {"name": "Notion", "amount": 990, "period": "monthly"},
+    {"name": "Canva Pro", "amount": 1290, "period": "monthly"},
+    {"name": "Adobe Creative Cloud", "amount": 2990, "period": "monthly"},
+    {"name": "Microsoft 365", "amount": 599, "period": "monthly"},
+    {"name": "Miro", "amount": 1200, "period": "monthly"},
+
+    # VPN / безопасность
+    {"name": "Kaspersky Plus", "amount": 299, "period": "monthly"},
+    {"name": "Dr.Web", "amount": 199, "period": "monthly"},
+    {"name": "NordVPN", "amount": 1290, "period": "monthly"},
+    {"name": "Surfshark", "amount": 1090, "period": "monthly"},
+
+    # книги
+    {"name": "ЛитРес", "amount": 399, "period": "monthly"},
+    {"name": "MyBook", "amount": 549, "period": "monthly"},
+    {"name": "Bookmate", "amount": 499, "period": "monthly"},
+
+    # здоровье
+    {"name": "FitStars", "amount": 799, "period": "monthly"},
+    {"name": "World Class", "amount": 4990, "period": "monthly"},
+    {"name": "Ясно", "amount": 1490, "period": "monthly"},
 ]
 
-# Дополнительно
+# допы
 NUM_MONTHS_HISTORY = 6
 RANDOM_SEED = 42
