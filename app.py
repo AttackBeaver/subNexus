@@ -310,17 +310,14 @@ if st.session_state.current_user is None:
     st.markdown("### Управление подписками в вашем банке")
 
     with st.form("gen_form"):
-        col1, col2 = st.columns([1, 2])
-        with col1:
-            num_users = st.number_input(
-                "Количество клиентов", min_value=10, max_value=500, value=st.session_state.num_users, step=50)
-        with col2:
-            submitted = st.form_submit_button(
-                "Сгенерировать данные", use_container_width=True)
-            if submitted:
-                st.session_state.num_users = num_users
-                load_data(num_users)
-                st.rerun()
+        num_users = st.number_input(
+            "Количество клиентов", min_value=10, max_value=500, value=st.session_state.num_users, step=50)
+        submitted = st.form_submit_button(
+            "Сгенерировать данные", use_container_width=True)
+        if submitted:
+            st.session_state.num_users = num_users
+            load_data(num_users)
+            st.rerun()
 
     if st.session_state.users_data is not None:
         search = st.text_input(
