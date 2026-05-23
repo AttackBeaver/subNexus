@@ -457,14 +457,10 @@ else:
     show_auto_notifications(user_id, visible_df, notify_off_set, total_visible)
 
     # Метрики
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("Общая сумма", f"{total_visible} ₽/мес")
-    with col2:
-        st.metric("Подписок", len(visible_df))
-    with col3:
-        _, amt = potential_savings(visible_df, important_set)
-        st.metric("Потенциальная экономия", f"{amt} ₽/мес")
+    st.metric("Общая сумма", f"{total_visible} ₽/мес")
+    st.metric("Подписок", len(visible_df))
+    _, amt = potential_savings(visible_df, important_set)
+    st.metric("Потенциальная экономия", f"{amt} ₽/мес")
 
     # Самые дорогие
     top = top_expensive(visible_df, 3)
