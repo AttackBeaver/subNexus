@@ -26,7 +26,7 @@ def generate_user_transactions(num_months=NUM_MONTHS_HISTORY, user_id=0):
 
     available_services = [
         s for s in POPULAR_SERVICES if s['name'] not in BLACKLIST_MERCHANTS]
-    num_subs = random.randint(4, 8)
+    num_subs = random.randint(4, 15)
     selected = random.sample(available_services, min(
         num_subs, len(available_services)))
 

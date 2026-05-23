@@ -6,24 +6,107 @@ from modules.subscription_detector import detect_subscriptions
 from modules.status_tracker import assign_statuses
 from modules.analytics import total_monthly_cost, top_expensive, simulate_savings, potential_savings
 
-
-st.set_page_config(page_title="SubNexus", layout="centered", page_icon="📱")
+st.set_page_config(page_title="SubNexus", layout="wide", page_icon="📱")
 
 st.markdown("""
 <style>
-    .main > div { max-width: 1100px; margin: 0 auto; }
-    .badge-warning { background-color: #f8d7da; color: #721c24; border-radius: 40px; padding: 2px 8px; font-size: 12px; white-space: nowrap; }
-    .badge-ok { background-color: #d4edda; color: #155724; border-radius: 40px; padding: 2px 8px; font-size: 12px; white-space: nowrap; }
-    .status-badge { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 500; background-color: #e9ecef; color: #495057; }
+    .main { padding: 0.5rem; }
+    /* Карточка клиента */
+    .client-card {
+        background-color: white;
+        border-radius: 24px;
+        padding: 1rem 1.2rem;
+        margin-bottom: 1rem;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        transition: 0.2s;
+    }
+    .client-card:hover {
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        border-color: #cbd5e1;
+    }
+    /* Карточка подписки */
+    .sub-card {
+        background-color: #ffffff;
+        border-radius: 20px;
+        padding: 0.8rem 1rem;
+        margin-bottom: 0.8rem;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+    }
+    /* Бейджи статусов */
+    .status-badge {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 30px;
+        font-size: 12px;
+        font-weight: 500;
+        background-color: #e9ecef;
+        color: #495057;
+    }
     .status-active { background-color: #d4edda; color: #155724; }
     .status-upcoming { background-color: #fff3cd; color: #856404; }
     .status-price-rise { background-color: #f8d7da; color: #721c24; }
     .status-unused { background-color: #e2e3e5; color: #383d41; }
     .status-trial { background-color: #d1ecf1; color: #0c5460; }
-    .metric-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 24px; padding: 1.5rem; color: white; text-align: center; margin-bottom: 1.5rem; }
-    .savings-card { background: #d1e7dd; border-left: 6px solid #198754; border-radius: 16px; padding: 1rem; margin: 1rem 0; }
-    div.stButton > button { background-color: #667eea; color: white; border-radius: 40px; padding: 0.5rem 1rem; border: none; width: 100%; font-weight: 500; }
-    div.stButton > button:hover { background-color: #5a67d8; }
+    /* Метрики */
+    .metric-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 24px;
+        padding: 1rem;
+        color: white;
+        text-align: center;
+        margin-bottom: 1rem;
+    }
+    /* Рекомендация внутри карточки */
+    .recommend-inline {
+        background-color: #f8f9fa;
+        border-radius: 14px;
+        padding: 0.6rem;
+        margin: 0.5rem 0;
+        font-size: 0.85rem;
+        border-left: 3px solid #667eea;
+    }
+    /* Кнопки в карточках */
+    div.stButton > button {
+        background-color: #667eea;
+        color: white;
+        border-radius: 40px;
+        padding: 0.3rem 0.6rem;
+        border: none;
+        font-weight: 500;
+        font-size: 0.85rem;
+        width: 100%;
+        transition: 0.1s;
+    }
+    div.stButton > button:hover {
+        background-color: #5a67d8;
+    }
+    /* Кнопка внутри карточки клиента */
+    .client-card div.stButton > button {
+        background-color: #f1f5f9;
+        color: #475569;
+        border: 1px solid #cbd5e1;
+        width: auto;
+        padding: 0.25rem 1rem;
+        font-size: 0.8rem;
+    }
+    .client-card div.stButton > button:hover {
+        background-color: #667eea;
+        color: white;
+        border-color: #667eea;
+    }
+    .client-card div.stButton {
+        text-align: center;
+        margin: 0;
+    }
+    /* Кнопки в карточке подписки */
+    .sub-card div.stButton > button {
+        padding: 0.2rem 0.4rem;
+        font-size: 0.75rem;
+        white-space: nowrap;
+    }
+    .stRadio > div { flex-direction: row; gap: 0.5rem; }
     hr { margin: 0.5rem 0; }
 </style>
 """, unsafe_allow_html=True)
@@ -42,12 +125,8 @@ if 'page' not in st.session_state:
     st.session_state.page = 0
 if 'search_term' not in st.session_state:
     st.session_state.search_term = ""
-if 'filter_unused' not in st.session_state:
-    st.session_state.filter_unused = False
-if 'filter_trial' not in st.session_state:
-    st.session_state.filter_trial = False
-if 'filter_price_rise' not in st.session_state:
-    st.session_state.filter_price_rise = False
+if 'filter_status' not in st.session_state:
+    st.session_state.filter_status = "Все"
 
 
 def load_data(num_users):
@@ -82,40 +161,45 @@ def back_to_list():
     st.session_state.current_user = None
 
 
+# Главная страница
 if st.session_state.current_user is None:
+    st.image(image='src/logo.png')
     st.title("SubNexus")
+    st.caption("Разработано командой 418:I'm teapot, в рамках чемпионата: Технологии больших данных и искусственного интеллекта")
     st.markdown("### Управление подписками в вашем банке")
 
     with st.form("gen_form"):
-        num_users = st.number_input(
-            "Количество клиентов", min_value=10, max_value=500, value=st.session_state.num_users, step=10)
-        submitted = st.form_submit_button(
-            "Сгенерировать данные", use_container_width=True)
-        if submitted:
-            st.session_state.num_users = num_users
-            load_data(num_users)
-            st.rerun()
+        col1, col2 = st.columns([1, 2])
+        with col1:
+            num_users = st.number_input(
+                "Количество клиентов", min_value=10, max_value=500, value=st.session_state.num_users, step=50)
+        with col2:
+            submitted = st.form_submit_button(
+                "Сгенерировать данные", use_container_width=True)
+            if submitted:
+                st.session_state.num_users = num_users
+                load_data(num_users)
+                st.rerun()
 
     if st.session_state.users_data is not None:
-        st.markdown("---")
-        col_search, col_filter1, col_filter2, col_filter3 = st.columns([
-                                                                       2, 1, 1, 1])
-        with col_search:
-            search = st.text_input(
-                "Поиск по ID клиента", value=st.session_state.search_term)
-        with col_filter1:
-            st.session_state.filter_unused = st.checkbox(
-                "Лишние", value=st.session_state.filter_unused)
-        with col_filter2:
-            st.session_state.filter_trial = st.checkbox(
-                "Пробный период", value=st.session_state.filter_trial)
-        with col_filter3:
-            st.session_state.filter_price_rise = st.checkbox(
-                "Рост цены", value=st.session_state.filter_price_rise)
-
+        search = st.text_input("Поиск по ID клиента", value=st.session_state.search_term, key="search_input")
         if search != st.session_state.search_term:
             st.session_state.search_term = search
             st.session_state.page = 0
+
+        # Заменяем pills на radio (горизонтальный) – работает стабильно
+        filter_options = ["Все", "Лишние", "Пробный период", "Рост цены"]
+        current_filter = st.radio(
+            "Фильтр по проблемам:",
+            options=filter_options,
+            index=filter_options.index(st.session_state.filter_status),
+            horizontal=True,
+            key="filter_radio"
+        )
+        if current_filter != st.session_state.filter_status:
+            st.session_state.filter_status = current_filter
+            st.session_state.page = 0
+            st.rerun()
 
         user_ids = sorted(st.session_state.users_data.keys())
         if st.session_state.search_term:
@@ -128,83 +212,81 @@ if st.session_state.current_user is None:
         filtered_ids = []
         for uid in user_ids:
             if f'subs_{uid}' not in st.session_state:
-                st.session_state[f'subs_{uid}'] = get_subscriptions_for_user(
-                    uid)
+                st.session_state[f'subs_{uid}'] = get_subscriptions_for_user(uid)
             subs_df = st.session_state[f'subs_{uid}']
-            cond_unused = (not st.session_state.filter_unused) or any(
-                subs_df['status'] == "Возможно не используется")
-            cond_trial = (not st.session_state.filter_trial) or any(
-                subs_df['status'] == "Пробный период")
-            cond_price = (not st.session_state.filter_price_rise) or any(
-                subs_df['status'] == "Цена выросла")
-            if cond_unused and cond_trial and cond_price:
+            if st.session_state.filter_status == "Лишние":
+                if any(subs_df['status'] == "Возможно не используется"):
+                    filtered_ids.append(uid)
+            elif st.session_state.filter_status == "Пробный период":
+                if any(subs_df['status'] == "Пробный период"):
+                    filtered_ids.append(uid)
+            elif st.session_state.filter_status == "Рост цены":
+                if any(subs_df['status'] == "Цена выросла"):
+                    filtered_ids.append(uid)
+            else:
                 filtered_ids.append(uid)
         user_ids = filtered_ids
-
-        page_size = 20
+        
+        page_size = 10
         total_pages = max(1, (len(user_ids) + page_size - 1) // page_size)
         start = st.session_state.page * page_size
         end = start + page_size
         paginated_ids = user_ids[start:end]
 
-        cols = st.columns([1, 1, 1, 1, 1, 1, 1, 1])
-        with cols[0]:
-            st.markdown("**👤**")
-        with cols[1]:
-            st.markdown("**📊**")
-        with cols[2]:
-            st.markdown("**📦**")
-        with cols[3]:
-            st.markdown("**💰**")
-        with cols[4]:
-            st.markdown("**🧹**")
-        with cols[5]:
-            st.markdown("**🎁**")
-        with cols[6]:
-            st.markdown("**📈**")
-
         for uid in paginated_ids:
             subs_df = st.session_state[f'subs_{uid}']
             transactions = st.session_state.users_data[uid]
-            total_cost = total_monthly_cost(subs_df)
-            has_unused = any(subs_df['status'] == "Возможно не используется")
-            has_trial = any(subs_df['status'] == "Пробный период")
-            has_price_rise = any(subs_df['status'] == "Цена выросла")
+            visible_subs = subs_df[~subs_df['merchant_name'].isin(
+                st.session_state.user_hidden.get(uid, set()))]
+            total_cost = total_monthly_cost(visible_subs)
+            has_unused = any(visible_subs['status']
+                             == "Возможно не используется")
+            has_trial = any(visible_subs['status'] == "Пробный период")
+            has_price_rise = any(visible_subs['status'] == "Цена выросла")
 
-            col1, col2, col3, col4, col5, col6, col7, col8 = st.columns(
-                [1, 1, 1, 1, 1, 1, 1, 1])
-            with col1:
-                st.write(f"{uid}")
-            with col2:
-                st.write(f"{len(transactions)}")
-            with col3:
-                st.write(f"**{len(subs_df)}**")
-            with col4:
-                st.write(f"**{total_cost} ₽**")
-            with col5:
-                st.markdown(
-                    '<span class="badge-warning">Найдено</span>' if has_unused else '<span class="badge-ok">Не найдено</span>', unsafe_allow_html=True)
-            with col6:
-                st.markdown(
-                    '<span class="badge-warning">Найдено</span>' if has_trial else '<span class="badge-ok">Не найдено</span>', unsafe_allow_html=True)
-            with col7:
-                st.markdown(
-                    '<span class="badge-warning">Найдено</span>' if has_price_rise else '<span class="badge-ok">Не найдено</span>', unsafe_allow_html=True)
-            with col8:
-                if st.button("→", key=f"btn_{uid}"):
-                    show_user_detail(uid)
-                    st.rerun()
-            st.divider()
+            with st.container():
+                st.markdown(f"""
+                <div class="client-card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+                        <div>
+                            <strong style="font-size: 1.2rem;">👤 Клиент {uid}</strong>
+                        </div>
+                        <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
+                """, unsafe_allow_html=True)
+                if has_unused:
+                    st.markdown(
+                        '<span class="status-badge status-unused">Лишние</span>', unsafe_allow_html=True)
+                if has_trial:
+                    st.markdown(
+                        '<span class="status-badge status-trial">Пробный период</span>', unsafe_allow_html=True)
+                if has_price_rise:
+                    st.markdown(
+                        '<span class="status-badge status-price-rise">Рост цены</span>', unsafe_allow_html=True)
+                st.markdown(f"""
+                        </div>
+                    </div>
+                    <div style="margin-top: 0.1rem;">
+                        <div>Транзакций: {len(transactions)}</div>
+                        <div>Подписок: {len(visible_subs)}</div>
+                        <div><strong>{total_cost} ₽/мес</strong></div>
+                    </div>
+                """, unsafe_allow_html=True)
+                col_btn = st.columns([1, 2, 1])[1]
+                with col_btn:
+                    if st.button("Подробнее →", key=f"btn_{uid}", use_container_width=False):
+                        show_user_detail(uid)
+                        st.rerun()
+                st.markdown("</div>", unsafe_allow_html=True)
 
         if total_pages > 1:
             col1, col2, col3 = st.columns([1, 2, 1])
             with col2:
-                left, right = st.columns(2)
-                with left:
+                col_left, col_right = st.columns(2)
+                with col_left:
                     if st.button("← Предыдущая", disabled=(st.session_state.page == 0)):
                         st.session_state.page -= 1
                         st.rerun()
-                with right:
+                with col_right:
                     if st.button("Следующая →", disabled=(st.session_state.page >= total_pages-1)):
                         st.session_state.page += 1
                         st.rerun()
@@ -212,149 +294,66 @@ if st.session_state.current_user is None:
         st.caption(
             f"Показано {len(paginated_ids)} из {len(user_ids)} клиентов (всего {len(st.session_state.users_data)})")
 
+# Страница клиента
 else:
     user_id = st.session_state.current_user
-    if st.button("← Назад к списку клиентов"):
+    if st.button("← Назад к списку клиентов", use_container_width=False):
         back_to_list()
         st.rerun()
 
-    st.header(f"Клиент {user_id}")
+    st.header(f"👤 Клиент {user_id}")
 
     transactions = st.session_state.users_data[user_id]
     subs_df = get_subscriptions_for_user(user_id)
     important_set = st.session_state.user_important.get(user_id, set())
     hidden_set = st.session_state.user_hidden.get(user_id, set())
 
-    total = total_monthly_cost(subs_df)
-    st.markdown(f"""
-    <div class="metric-card">
-        <h3 style="margin:0">Общая сумма оплаты в месяц</h3>
-        <h1 style="margin:0">{total} ₽</h1>
-    </div>
-    """, unsafe_allow_html=True)
+    # Видимые подписки
+    visible_df = subs_df[~subs_df['merchant_name'].isin(hidden_set)]
+    total_visible = total_monthly_cost(visible_df)
 
-    top = top_expensive(subs_df, 3)
+    # Метрики
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Общая сумма", f"{total_visible} ₽/мес")
+    with col2:
+        st.metric("Подписок", len(visible_df))
+    with col3:
+        _, amt = potential_savings(visible_df, important_set)
+        st.metric("Потенциальная экономия", f"{amt} ₽/мес")
+
+    # Самые дорогие
+    top = top_expensive(visible_df, 3)
     if top:
-        st.markdown("#### Самые дорогие подписки:")
+        st.markdown("#### Самые дорогие подписки")
         for t in top:
-            st.info(
-                f"**{t['merchant_name']}**: {t['monthly_cost']} ₽/мес")
+            st.info(f"**{t['merchant_name']}**: {t['monthly_cost']} ₽/мес")
 
-    st.subheader("Персональные рекомендации")
-    st.caption(
-        "На основе анализа ваших транзакций мы подготовили несколько наблюдений. Решение остаётся за вами.")
-
-    problem_subs = subs_df[subs_df['status'].isin(
-        ["Возможно не используется", "Цена выросла", "Пробный период", "Скоро списание"])]
-    problem_subs = problem_subs[~problem_subs['merchant_name'].isin(
-        hidden_set)]
-
-    if not problem_subs.empty:
-        total_savings = 0.0
-        for _, row in problem_subs.iterrows():
-            merchant = row['merchant_name']
-            status = row['status']
-            amount = row['amount']
-            period = row['period_days']
-            if period == 365:
-                monthly_cost = amount / 12
-            elif period == 7:
-                monthly_cost = amount * (30/7)
-            else:
-                monthly_cost = amount
-
-            if status == "Возможно не используется":
-                last_date = row['last_payment_date'].date()
-                days_ago = (date.today() - last_date).days
-                reason = f"Вы не пользовались сервисом {merchant} более {days_ago} дней. Возможно, он вам больше не нужен."
-                savings = monthly_cost
-                action = "отключить"
-            elif status == "Цена выросла":
-                merchant_txs = transactions[transactions['merchant_name'] == merchant].sort_values(
-                    'date')
-                amounts = merchant_txs['amount'].values
-                non_zero = [a for a in amounts if a > 0]
-                if len(non_zero) >= 2:
-                    old_price = non_zero[0]
-                    new_price = non_zero[-1]
-                    if old_price == new_price and len(non_zero) > 2:
-                        old_price = non_zero[-2]
-                    if old_price != new_price:
-                        increase_pct = (new_price - old_price) / \
-                            old_price * 100
-                        reason = f"Стоимость {merchant} выросла с {old_price:.2f} ₽ до {new_price:.2f} ₽ (+{increase_pct:.0f}%). Вы продолжаете платить по новой цене."
-                    else:
-                        reason = f"Стоимость {merchant} выросла (текущая цена {amount} ₽). Рекомендуем проверить условия подписки."
-                    savings = 0
-                    action = "пересмотреть"
-                else:
-                    reason = f"Стоимость {merchant} выросла (текущая цена {amount} ₽)."
-                    savings = 0
-                    action = "проверить"
-            elif status == "Пробный период":
-                next_payment = row['next_payment_date'].date()
-                days_left = (next_payment - date.today()).days
-                reason = f"Пробный период {merchant} заканчивается через {days_left} дней. Затем начнётся списание {amount} ₽/мес."
-                savings = monthly_cost
-                action = "отключить до списания"
-            elif status == "Скоро списание":
-                next_payment = row['next_payment_date'].date()
-                days_left = (next_payment - date.today()).days
-                reason = f"Через {days_left} дня(ей) спишется {amount} ₽ за {merchant}. Напомним, что это регулярный платёж."
-                savings = 0
-                action = "проверить необходимость"
-            else:
-                continue
-
-            with st.container():
-                st.markdown(f"""
-                <div style="background-color: #f8f9fa; border-radius: 16px; padding: 12px; margin-bottom: 12px;">
-                    <strong>{reason}</strong>
-                </div>
-                """, unsafe_allow_html=True)
-                col_a, col_b = st.columns([2, 1])
-                with col_a:
-                    if savings > 0:
-                        st.caption(
-                            f"Потенциальная экономия: **{savings:.2f} ₽/мес**, если {action} подписку.")
-                    else:
-                        st.caption(
-                            f"Рекомендуем {action} целесообразность этой подписки.")
-                with col_b:
-                    if status in ["Возможно не используется", "Пробный период"]:
-                        if st.button(f"Смоделировать отключение", key=f"rec_sim_{user_id}_{merchant}"):
-                            new_total = simulate_savings(subs_df, [merchant])
-                            st.success(
-                                f"Если отключить {merchant}, ежемесячные траты снизятся с {total} ₽ до {new_total} ₽ (экономия {total - new_total:.2f} ₽/мес).")
-            total_savings += savings
-
-        if total_savings > 0:
-            st.info(
-                f"**Общая потенциальная экономия в месяц: {total_savings:.2f} ₽**, если отключить все указанные подписки.")
-    else:
-        st.success(
-            "Отлично! Все ваши подписки выглядят актуально. Нет явно лишних или проблемных.")
-
-    filter_option = st.radio("Фильтр:", [
-                             "Все", "Редко используемые", "Дорогие", "Скоро спишут"], horizontal=True)
-    display_df = subs_df[~subs_df['merchant_name'].isin(hidden_set)]
+    # Фильтры
+    filter_option = st.radio(
+        "Фильтр подписок:",
+        ["Все", "Редко используемые", "Дорогие", "Скоро спишут"],
+        horizontal=True,
+        key="sub_filter"
+    )
+    display_df = visible_df.copy()
     if filter_option == "Редко используемые":
         display_df = display_df[display_df['status']
                                 == "Возможно не используется"]
     elif filter_option == "Дорогие":
-        display_df = display_df.copy()
-        monthly = []
-        for _, row in display_df.iterrows():
-            p = row['period_days']
-            am = row['amount']
+        monthly_cost = []
+        for _, r in display_df.iterrows():
+            p = r['period_days']
+            a = r['amount']
             if p == 365:
-                mon = am / 12
+                mon = a / 12
             elif p == 7:
-                mon = am * (30/7)
+                mon = a * (30/7)
             else:
-                mon = am
-            monthly.append(mon)
-        display_df['monthly_cost'] = monthly
+                mon = a
+            monthly_cost.append(mon)
+        display_df = display_df.copy()
+        display_df['monthly_cost'] = monthly_cost
         display_df = display_df.nlargest(3, 'monthly_cost')
     elif filter_option == "Скоро спишут":
         display_df = display_df[display_df['status'] == "Скоро списание"]
@@ -364,7 +363,12 @@ else:
         st.warning("Нет подписок по выбранному фильтру.")
     else:
         for _, row in display_df.iterrows():
+            merchant = row['merchant_name']
             status = row['status']
+            amount = row['amount']
+            next_date = row['next_payment_date'].strftime('%d.%m.%Y')
+            is_important = merchant in important_set
+
             status_class = "status-badge"
             if status == "Активна":
                 status_class += " status-active"
@@ -377,36 +381,106 @@ else:
             elif status == "Пробный период":
                 status_class += " status-trial"
 
-            next_date = row['next_payment_date'].strftime('%d.%m.%Y')
-            is_important = row['merchant_name'] in important_set
-
-            cols = st.columns([4, 0.5, 0.5])
-            with cols[0]:
-                st.markdown(f"**{row['merchant_name']}**")
-                st.caption(f"{row['amount']} ₽ • {next_date}")
-                st.markdown(
-                    f'<span class="{status_class}">{status}</span>', unsafe_allow_html=True)
-            with cols[1]:
-                if st.button("⭐" if is_important else "☆", key=f"imp_{user_id}_{row['merchant_name']}"):
-                    if is_important:
-                        st.session_state.user_important[user_id].discard(
-                            row['merchant_name'])
+            # Рекомендация
+            recommendation = None
+            if status in ["Возможно не используется", "Цена выросла", "Пробный период", "Скоро списание"]:
+                if status == "Возможно не используется":
+                    last_date = row['last_payment_date'].date()
+                    days_ago = (date.today() - last_date).days
+                    rec_text = f"Вы не пользовались сервисом более {days_ago} дней. Возможно, он вам больше не нужен."
+                    savings = total_monthly_cost(pd.DataFrame([row]))
+                elif status == "Цена выросла":
+                    merchant_txs = transactions[transactions['merchant_name'] == merchant].sort_values(
+                        'date')
+                    amounts_list = merchant_txs['amount'].values
+                    non_zero = [a for a in amounts_list if a > 0]
+                    if len(non_zero) >= 2:
+                        old_price = non_zero[0]
+                        new_price = non_zero[-1]
+                        if old_price == new_price and len(non_zero) > 2:
+                            old_price = non_zero[-2]
+                        if old_price != new_price:
+                            inc = (new_price - old_price) / old_price * 100
+                            rec_text = f"Стоимость выросла с {old_price:.2f} ₽ до {new_price:.2f} ₽ (+{inc:.0f}%)."
+                        else:
+                            rec_text = f"Стоимость выросла (текущая {amount} ₽). Рекомендуем проверить условия."
                     else:
-                        st.session_state.user_important[user_id].add(
-                            row['merchant_name'])
-                    st.rerun()
-            with cols[2]:
-                if st.button("❌", key=f"hide_{user_id}_{row['merchant_name']}"):
-                    st.session_state.user_hidden[user_id].add(
-                        row['merchant_name'])
-                    st.rerun()
-            st.divider()
+                        rec_text = f"Стоимость выросла (текущая {amount} ₽)."
+                    savings = 0
+                elif status == "Пробный период":
+                    next_pay = row['next_payment_date'].date()
+                    days_left = (next_pay - date.today()).days
+                    rec_text = f"Пробный период заканчивается через {days_left} дней. Затем начнётся списание {amount} ₽/мес."
+                    savings = total_monthly_cost(pd.DataFrame([row]))
+                elif status == "Скоро списание":
+                    next_pay = row['next_payment_date'].date()
+                    days_left = (next_pay - date.today()).days
+                    rec_text = f"Через {days_left} дня(ей) спишется {amount} ₽."
+                    savings = 0
+                recommendation = (rec_text, savings)
 
+            # Карточка подписки
+            with st.container():
+                st.markdown(f"""
+                <div class="sub-card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+                        <div>
+                            <strong>{merchant}</strong><br>
+                            <span style="font-size: 0.9rem;">{amount} ₽ • {next_date}</span>
+                        </div>
+                        <div>
+                            <span class="{status_class}">{status}</span>
+                        </div>
+                    </div>
+                """, unsafe_allow_html=True)
+
+                if recommendation:
+                    rec_text, savings = recommendation
+                    st.markdown(f"""
+                    <div class="recommend-inline">
+                        <strong>Рекомендация:</strong> {rec_text}
+                    """, unsafe_allow_html=True)
+                    if savings > 0:
+                        st.caption(
+                            f"Потенциальная экономия: **{savings:.2f} ₽/мес**, если отключить.")
+                    else:
+                        st.caption(
+                            f"Рекомендуем проверить целесообразность.")
+                    if status in ["Возможно не используется", "Пробный период"]:
+                        if st.button(f"Смоделировать отключение", key=f"sim_{user_id}_{merchant}"):
+                            new_total = simulate_savings(
+                                visible_df, [merchant])
+                            st.success(
+                                f"Если отключить {merchant}, ежемесячные траты снизятся с {total_visible} ₽ до {new_total} ₽ (экономия {total_visible - new_total:.2f} ₽/мес).")
+                    st.markdown("</div>", unsafe_allow_html=True)
+
+                # Компактные кнопки управления
+                cols = st.columns([0.8, 0.8, 0.8])
+                with cols[0]:
+                    if st.button("Важная" if not is_important else "Важная ✓", key=f"imp_{user_id}_{merchant}"):
+                        if is_important:
+                            st.session_state.user_important[user_id].discard(
+                                merchant)
+                        else:
+                            st.session_state.user_important[user_id].add(
+                                merchant)
+                        st.rerun()
+                with cols[1]:
+                    if st.button("Скрыть", key=f"hide_{user_id}_{merchant}"):
+                        st.session_state.user_hidden[user_id].add(merchant)
+                        st.rerun()
+                with cols[2]:
+                    if st.button("Ошибочна", key=f"wrong_{user_id}_{merchant}"):
+                        st.session_state.user_hidden[user_id].add(merchant)
+                        st.rerun()
+                st.markdown("</div>", unsafe_allow_html=True)
+
+    # Тестирование уведомлений
     st.subheader("Тестирование уведомлений")
     col1, col2 = st.columns(2)
     with col1:
         if st.button("Скоро списание"):
-            upcoming = subs_df[subs_df['status'] == "Скоро списание"]
+            upcoming = visible_df[visible_df['status'] == "Скоро списание"]
             if not upcoming.empty:
                 msg = ", ".join(
                     [f"{r['merchant_name']} ({r['amount']} ₽)" for _, r in upcoming.iterrows()])
@@ -414,7 +488,7 @@ else:
             else:
                 st.toast("Нет подписок с ближайшим списанием", icon="ℹ️")
         if st.button("Рост цены"):
-            price_rise = subs_df[subs_df['status'] == "Цена выросла"]
+            price_rise = visible_df[visible_df['status'] == "Цена выросла"]
             if not price_rise.empty:
                 msg = ", ".join(
                     [f"{r['merchant_name']} (теперь {r['amount']} ₽)" for _, r in price_rise.iterrows()])
@@ -423,7 +497,7 @@ else:
                 st.toast("Нет подписок с ростом цены", icon="ℹ️")
     with col2:
         if st.button("Пробный период"):
-            trial = subs_df[subs_df['status'] == "Пробный период"]
+            trial = visible_df[visible_df['status'] == "Пробный период"]
             if not trial.empty:
                 msg = ", ".join(
                     [f"{r['merchant_name']} (след. списание {r['amount']} ₽)" for _, r in trial.iterrows()])
@@ -431,7 +505,7 @@ else:
             else:
                 st.toast("Нет подписок в пробном периоде", icon="ℹ️")
         if st.button("Лишняя подписка"):
-            unused_names, amt = potential_savings(subs_df, important_set)
+            unused_names, amt = potential_savings(visible_df, important_set)
             if unused_names:
                 st.toast(
                     f"💡 Обнаружены редко используемые подписки: {', '.join(unused_names)}. Экономия ~{amt} ₽/мес", icon="💡")
