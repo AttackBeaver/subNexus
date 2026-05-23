@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from datetime import date
+from datetime import date, timedelta
 from modules.data_generator import generate_all_users_transactions
 from modules.subscription_detector import detect_subscriptions
 from modules.status_tracker import assign_statuses
@@ -28,9 +28,9 @@ st.markdown("""
     /* Карточка подписки */
     .sub-card {
         background-color: #ffffff;
-        border-radius: 20px;
-        padding: 0.8rem 1rem;
-        margin-bottom: 0.8rem;
+        border-radius: 16px;
+        padding: 0.5rem;
+        margin-bottom: 0.6rem;
         border: 1px solid #e2e8f0;
         box-shadow: 0 1px 2px rgba(0,0,0,0.02);
     }
@@ -72,7 +72,6 @@ st.markdown("""
         background-color: #667eea;
         color: white;
         border-radius: 40px;
-        padding: 0.3rem 0.6rem;
         border: none;
         font-weight: 500;
         font-size: 0.85rem;
@@ -102,12 +101,38 @@ st.markdown("""
     }
     /* Кнопки в карточке подписки */
     .sub-card div.stButton > button {
-        padding: 0.2rem 0.4rem;
-        font-size: 0.75rem;
-        white-space: nowrap;
+        padding: 0.3rem;
+        font-size: 1rem;
+        min-width: 2rem;
     }
     .stRadio > div { flex-direction: row; gap: 0.5rem; }
     hr { margin: 0.5rem 0; }
+    /* Горизонтальное расположение кнопок в карточке подписки */
+    .sub-card .stButton {
+        display: inline-block;
+        width: auto;
+        margin-right: 4px;
+    }
+    .sub-card div:has(> div.stButton) {
+        display: flex;
+        flex-wrap: nowrap;
+        gap: 4px;
+        justify-content: flex-start;
+    }
+    .sub-card div.stButton > button {
+        white-space: nowrap;
+        min-width: 2.5rem;
+        padding: 0.3rem 0.5rem;
+    }
+    /* Принудительное горизонтальное расположение кнопок */
+    .stHorizontalBlock {
+        gap: 1 !important;
+    }
+    .stHorizontalBlock .stColumn {
+        flex: 1 1 auto !important;
+        min-width: 0 !important;
+        padding: 0 2px !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -127,6 +152,12 @@ if 'search_term' not in st.session_state:
     st.session_state.search_term = ""
 if 'filter_status' not in st.session_state:
     st.session_state.filter_status = "Все"
+if 'user_notify_off' not in st.session_state:
+    st.session_state.user_notify_off = {}
+if 'user_custom_subs' not in st.session_state:
+    st.session_state.user_custom_subs = {}
+if 'notifications_sent' not in st.session_state:
+    st.session_state.notifications_sent = {}
 
 
 def load_data(num_users):
@@ -137,19 +168,31 @@ def load_data(num_users):
                       if k.startswith('subs_')]
     for k in keys_to_remove:
         del st.session_state[k]
+    st.session_state.user_custom_subs = {}
     for uid in st.session_state.users_data.keys():
         if uid not in st.session_state.user_important:
             st.session_state.user_important[uid] = set()
         if uid not in st.session_state.user_hidden:
             st.session_state.user_hidden[uid] = set()
+        if uid not in st.session_state.user_notify_off:
+            st.session_state.user_notify_off[uid] = set()
+        if uid not in st.session_state.user_custom_subs:
+            st.session_state.user_custom_subs[uid] = []
+
     st.session_state.page = 0
     st.session_state.search_term = ""
+    st.session_state.notifications_sent = {}
 
 
 def get_subscriptions_for_user(user_id):
+    # Возвращаем закэшированные подписки
+    if f'subs_{user_id}' in st.session_state:
+        return st.session_state[f'subs_{user_id}']
+    # Иначе вычисляем из транзакций
     transactions = st.session_state.users_data[user_id]
     subs = detect_subscriptions(transactions)
     subs = assign_statuses(subs, transactions, date.today())
+    st.session_state[f'subs_{user_id}'] = subs
     return subs
 
 
@@ -159,6 +202,104 @@ def show_user_detail(user_id):
 
 def back_to_list():
     st.session_state.current_user = None
+
+
+def add_custom_subscription(user_id, merchant_name, amount, period_days, start_date):
+    """Добавляет ручную подписку и обновляет данные пользователя."""
+    # Добавляем транзакцию в историю
+    new_tx = pd.DataFrame([{
+        'date': pd.to_datetime(start_date),
+        'merchant_name': merchant_name,
+        'amount': amount,
+        'transaction_id': f'custom_{user_id}_{len(st.session_state.users_data[user_id])}'
+    }])
+    st.session_state.users_data[user_id] = pd.concat(
+        [st.session_state.users_data[user_id], new_tx], ignore_index=True)
+
+    # Получаем текущий DataFrame подписок или создаём новый
+    if f'subs_{user_id}' in st.session_state:
+        subs_df = st.session_state[f'subs_{user_id}']
+    else:
+        subs_df = detect_subscriptions(st.session_state.users_data[user_id])
+        subs_df = assign_statuses(
+            subs_df, st.session_state.users_data[user_id], date.today())
+
+    # Создаём запись подписки вручную
+    last_date = pd.to_datetime(start_date)
+    next_date = last_date + timedelta(days=period_days)
+    custom_sub_row = {
+        'merchant_name': merchant_name,
+        'amount': amount,
+        'period_days': period_days,
+        'last_payment_date': last_date,
+        'next_payment_date': next_date,
+        'first_payment_date': last_date
+    }
+
+    # Добавляем новую строку и обновляем статусы
+    new_row_df = pd.DataFrame([custom_sub_row])
+    updated_subs = pd.concat([subs_df, new_row_df], ignore_index=True)
+    updated_subs = assign_statuses(
+        updated_subs, st.session_state.users_data[user_id], date.today())
+
+    # Сохраняем в кэш
+    st.session_state[f'subs_{user_id}'] = updated_subs
+
+    # Сохраняем в user_custom_subs для информации
+    if user_id not in st.session_state.user_custom_subs:
+        st.session_state.user_custom_subs[user_id] = []
+    st.session_state.user_custom_subs[user_id].append(custom_sub_row)
+
+
+def show_auto_notifications(user_id, visible_df, notify_off_set, total_visible):
+    """Показывает автоматические уведомления для текущего пользователя"""
+    sent = st.session_state.notifications_sent.get(user_id, set())
+    today = date.today()
+
+    # Уведомления для каждой подписки
+    for _, row in visible_df.iterrows():
+        merchant = row['merchant_name']
+        status = row['status']
+        # Пропускаем, если уведомления отключены для этой подписки
+        if merchant in notify_off_set:
+            continue
+
+        # Ключ для уникальности
+        if status == "Скоро списание":
+            days = (row['next_payment_date'].date() - today).days
+            if 1 <= days <= 3:
+                key = f"{user_id}_{merchant}_upcoming"
+                if key not in sent:
+                    st.toast(
+                        f"⏰ Через {days} дня(ей) спишется {row['amount']} ₽ за {merchant}.", icon="🔔")
+                    sent.add(key)
+        elif status == "Цена выросла":
+            key = f"{user_id}_{merchant}_price_rise"
+            if key not in sent:
+                st.toast(
+                    f"📈 Стоимость {merchant} выросла. Текущая цена {row['amount']} ₽.", icon="📈")
+                sent.add(key)
+        elif status == "Пробный период":
+            next_pay = row['next_payment_date'].date()
+            days_left = (next_pay - today).days
+            if days_left >= 0:
+                key = f"{user_id}_{merchant}_trial"
+                if key not in sent:
+                    st.toast(
+                        f"⚠️ Пробный период {merchant} заканчивается через {days_left} дней. Затем списание {row['amount']} ₽/мес.", icon="⏳")
+                    sent.add(key)
+
+    # Ежемесячное сводное уведомление
+    summary_key = f"{user_id}_monthly_summary"
+    if summary_key not in sent:
+        num_subs = len(visible_df)
+        if num_subs > 0:
+            st.toast(
+                f"📊 Вы платите за {num_subs} подписок, общая сумма — {total_visible} ₽ в месяц.", icon="💰")
+            sent.add(summary_key)
+
+    # Сохраняем отправленные уведомления
+    st.session_state.notifications_sent[user_id] = sent
 
 
 # Главная страница
@@ -182,24 +323,26 @@ if st.session_state.current_user is None:
                 st.rerun()
 
     if st.session_state.users_data is not None:
-        search = st.text_input("Поиск по ID клиента", value=st.session_state.search_term, key="search_input")
+        search = st.text_input(
+            "Поиск по ID клиента", value=st.session_state.search_term, key="search_input")
         if search != st.session_state.search_term:
             st.session_state.search_term = search
             st.session_state.page = 0
 
-        # Заменяем pills на radio (горизонтальный) – работает стабильно
+        # Фильтр по проблемам
         filter_options = ["Все", "Лишние", "Пробный период", "Рост цены"]
         current_filter = st.radio(
             "Фильтр по проблемам:",
             options=filter_options,
             index=filter_options.index(st.session_state.filter_status),
             horizontal=True,
-            key="filter_radio"
+            key="filter_radio",
+            on_change=lambda: None
         )
+        # Обновляем состояние, но не делаем rerun
         if current_filter != st.session_state.filter_status:
             st.session_state.filter_status = current_filter
             st.session_state.page = 0
-            st.rerun()
 
         user_ids = sorted(st.session_state.users_data.keys())
         if st.session_state.search_term:
@@ -212,7 +355,8 @@ if st.session_state.current_user is None:
         filtered_ids = []
         for uid in user_ids:
             if f'subs_{uid}' not in st.session_state:
-                st.session_state[f'subs_{uid}'] = get_subscriptions_for_user(uid)
+                st.session_state[f'subs_{uid}'] = get_subscriptions_for_user(
+                    uid)
             subs_df = st.session_state[f'subs_{uid}']
             if st.session_state.filter_status == "Лишние":
                 if any(subs_df['status'] == "Возможно не используется"):
@@ -226,7 +370,7 @@ if st.session_state.current_user is None:
             else:
                 filtered_ids.append(uid)
         user_ids = filtered_ids
-        
+
         page_size = 10
         total_pages = max(1, (len(user_ids) + page_size - 1) // page_size)
         start = st.session_state.page * page_size
@@ -271,9 +415,9 @@ if st.session_state.current_user is None:
                         <div><strong>{total_cost} ₽/мес</strong></div>
                     </div>
                 """, unsafe_allow_html=True)
-                col_btn = st.columns([1, 2, 1])[1]
-                with col_btn:
-                    if st.button("Подробнее →", key=f"btn_{uid}", use_container_width=False):
+                col_left, col_right = st.columns([2, 1])
+                with col_right:
+                    if st.button("Подробнее", key=f"btn_{uid}", use_container_width=False):
                         show_user_detail(uid)
                         st.rerun()
                 st.markdown("</div>", unsafe_allow_html=True)
@@ -307,10 +451,13 @@ else:
     subs_df = get_subscriptions_for_user(user_id)
     important_set = st.session_state.user_important.get(user_id, set())
     hidden_set = st.session_state.user_hidden.get(user_id, set())
+    notify_off_set = st.session_state.user_notify_off.get(user_id, set())
 
     # Видимые подписки
     visible_df = subs_df[~subs_df['merchant_name'].isin(hidden_set)]
     total_visible = total_monthly_cost(visible_df)
+    # Автоматические уведомления
+    show_auto_notifications(user_id, visible_df, notify_off_set, total_visible)
 
     # Метрики
     col1, col2, col3 = st.columns(3)
@@ -328,6 +475,30 @@ else:
         st.markdown("#### Самые дорогие подписки")
         for t in top:
             st.info(f"**{t['merchant_name']}**: {t['monthly_cost']} ₽/мес")
+
+    # Форма ручного добавления подписки
+    with st.expander("➕ Добавить подписку вручную"):
+        with st.form(key=f"add_sub_form_{user_id}"):
+            col1, col2 = st.columns(2)
+            with col1:
+                new_name = st.text_input(
+                    "Название сервиса", placeholder="например, Яндекс.Плюс")
+                new_amount = st.number_input(
+                    "Сумма (₽)", min_value=0.0, step=50.0)
+            with col2:
+                period_options = {"Ежемесячно": 30,
+                                  "Еженедельно": 7, "Ежегодно": 365}
+                period_choice = st.selectbox(
+                    "Периодичность", list(period_options.keys()))
+                period_days = period_options[period_choice]
+                start_date = st.date_input(
+                    "Дата первого платежа", value=date.today())
+            submitted = st.form_submit_button("Добавить")
+            if submitted and new_name:
+                add_custom_subscription(
+                    user_id, new_name, new_amount, period_days, start_date)
+                st.success(f"Подписка {new_name} добавлена!")
+                st.rerun()
 
     # Фильтры
     filter_option = st.radio(
@@ -434,6 +605,39 @@ else:
                     </div>
                 """, unsafe_allow_html=True)
 
+                is_notify_off = merchant in notify_off_set
+                # Горизонтальный ряд кнопок
+                col_imp, col_notify, col_hide, col_wrong = st.columns(
+                    4, gap="small")
+                with col_imp:
+                    icon = "⭐" if not is_important else "⭐ ✓"
+                    if st.button(icon, key=f"imp_{user_id}_{merchant}", help="Важная"):
+                        if is_important:
+                            st.session_state.user_important[user_id].discard(
+                                merchant)
+                        else:
+                            st.session_state.user_important[user_id].add(
+                                merchant)
+                        st.rerun()
+                with col_notify:
+                    notify_icon = "🔕" if is_notify_off else "🔔"
+                    if st.button(notify_icon, key=f"notify_{user_id}_{merchant}", help="Уведомления"):
+                        if is_notify_off:
+                            st.session_state.user_notify_off[user_id].discard(
+                                merchant)
+                        else:
+                            st.session_state.user_notify_off[user_id].add(
+                                merchant)
+                        st.rerun()
+                with col_hide:
+                    if st.button("👁️‍🗨️", key=f"hide_{user_id}_{merchant}", help="Скрыть"):
+                        st.session_state.user_hidden[user_id].add(merchant)
+                        st.rerun()
+                with col_wrong:
+                    if st.button("⚠️", key=f"wrong_{user_id}_{merchant}", help="Ошибочна"):
+                        st.session_state.user_hidden[user_id].add(merchant)
+                        st.rerun()
+
                 if recommendation:
                     rec_text, savings = recommendation
                     st.markdown(f"""
@@ -453,27 +657,6 @@ else:
                             st.success(
                                 f"Если отключить {merchant}, ежемесячные траты снизятся с {total_visible} ₽ до {new_total} ₽ (экономия {total_visible - new_total:.2f} ₽/мес).")
                     st.markdown("</div>", unsafe_allow_html=True)
-
-                # Компактные кнопки управления
-                cols = st.columns([0.8, 0.8, 0.8])
-                with cols[0]:
-                    if st.button("Важная" if not is_important else "Важная ✓", key=f"imp_{user_id}_{merchant}"):
-                        if is_important:
-                            st.session_state.user_important[user_id].discard(
-                                merchant)
-                        else:
-                            st.session_state.user_important[user_id].add(
-                                merchant)
-                        st.rerun()
-                with cols[1]:
-                    if st.button("Скрыть", key=f"hide_{user_id}_{merchant}"):
-                        st.session_state.user_hidden[user_id].add(merchant)
-                        st.rerun()
-                with cols[2]:
-                    if st.button("Ошибочна", key=f"wrong_{user_id}_{merchant}"):
-                        st.session_state.user_hidden[user_id].add(merchant)
-                        st.rerun()
-                st.markdown("</div>", unsafe_allow_html=True)
 
     # Тестирование уведомлений
     st.subheader("Тестирование уведомлений")
