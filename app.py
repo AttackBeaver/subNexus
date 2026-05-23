@@ -206,6 +206,16 @@ def back_to_list():
 
 def add_custom_subscription(user_id, merchant_name, amount, period_days, start_date):
     """Добавляет ручную подписку и обновляет данные пользователя."""
+    if amount <= 0:
+        st.error("Сумма должна быть положительной. Подписка не добавлена.")
+        return
+
+    # Корректировка для годовой подписки, если дата начала 29 февраля
+    next_date = start_date + timedelta(days=period_days)
+    if period_days == 365 and start_date.month == 2 and start_date.day == 29:
+        # Следующая дата: 28 февраля следующего года (если не високосный)
+        next_date = start_date.replace(year=start_date.year + 1, day=28)
+
     # Добавляем транзакцию в историю
     new_tx = pd.DataFrame([{
         'date': pd.to_datetime(start_date),
@@ -226,7 +236,6 @@ def add_custom_subscription(user_id, merchant_name, amount, period_days, start_d
 
     # Создаём запись подписки вручную
     last_date = pd.to_datetime(start_date)
-    next_date = last_date + timedelta(days=period_days)
     custom_sub_row = {
         'merchant_name': merchant_name,
         'amount': amount,
@@ -477,7 +486,7 @@ else:
                 new_name = st.text_input(
                     "Название сервиса", placeholder="например, Яндекс.Плюс")
                 new_amount = st.number_input(
-                    "Сумма (₽)", min_value=0.0, step=50.0)
+                    "Сумма (₽)", min_value=0.0, value=0.0, step=50.0, format="%.2f")
             with col2:
                 period_options = {"Ежемесячно": 30,
                                   "Еженедельно": 7, "Ежегодно": 365}
@@ -487,11 +496,16 @@ else:
                 start_date = st.date_input(
                     "Дата первого платежа", value=date.today())
             submitted = st.form_submit_button("Добавить")
-            if submitted and new_name:
-                add_custom_subscription(
-                    user_id, new_name, new_amount, period_days, start_date)
-                st.success(f"Подписка {new_name} добавлена!")
-                st.rerun()
+            if submitted:
+                if not new_name:
+                    st.error("Введите название сервиса.")
+                elif new_amount <= 0:
+                    st.error("Сумма подписки должна быть положительной.")
+                else:
+                    add_custom_subscription(
+                        user_id, new_name, new_amount, period_days, start_date)
+                    st.success(f"Подписка {new_name} добавлена!")
+                    st.rerun()
 
     # Фильтры
     filter_option = st.radio(
@@ -526,7 +540,7 @@ else:
     if display_df.empty:
         st.warning("Нет подписок по выбранному фильтру.")
     else:
-        for _, row in display_df.iterrows():
+        for idx, row in display_df.iterrows():
             merchant = row['merchant_name']
             status = row['status']
             amount = row['amount']
@@ -604,7 +618,7 @@ else:
                     4, gap="small")
                 with col_imp:
                     icon = "⭐" if not is_important else "⭐ ✓"
-                    if st.button(icon, key=f"imp_{user_id}_{merchant}", help="Важная"):
+                    if st.button(icon, key=f"imp_{user_id}_{merchant}_{idx}", help="Важная"):
                         if is_important:
                             st.session_state.user_important[user_id].discard(
                                 merchant)
@@ -614,7 +628,7 @@ else:
                         st.rerun()
                 with col_notify:
                     notify_icon = "🔕" if is_notify_off else "🔔"
-                    if st.button(notify_icon, key=f"notify_{user_id}_{merchant}", help="Уведомления"):
+                    if st.button(notify_icon, key=f"notify_{user_id}_{merchant}_{idx}", help="Уведомления"):
                         if is_notify_off:
                             st.session_state.user_notify_off[user_id].discard(
                                 merchant)
@@ -623,11 +637,11 @@ else:
                                 merchant)
                         st.rerun()
                 with col_hide:
-                    if st.button("👁️‍🗨️", key=f"hide_{user_id}_{merchant}", help="Скрыть"):
+                    if st.button("👁️‍🗨️", key=f"hide_{user_id}_{merchant}_{idx}", help="Скрыть"):
                         st.session_state.user_hidden[user_id].add(merchant)
                         st.rerun()
                 with col_wrong:
-                    if st.button("⚠️", key=f"wrong_{user_id}_{merchant}", help="Ошибочна"):
+                    if st.button("⚠️", key=f"wrong_{user_id}_{merchant}_{idx}", help="Ошибочна"):
                         st.session_state.user_hidden[user_id].add(merchant)
                         st.rerun()
 
@@ -644,7 +658,7 @@ else:
                         st.caption(
                             f"Рекомендуем проверить целесообразность.")
                     if status in ["Возможно не используется", "Пробный период"]:
-                        if st.button(f"Смоделировать отключение", key=f"sim_{user_id}_{merchant}"):
+                        if st.button(f"Смоделировать отключение", key=f"sim_{user_id}_{merchant}_{idx}"):
                             new_total = simulate_savings(
                                 visible_df, [merchant])
                             st.success(
