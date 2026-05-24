@@ -272,6 +272,8 @@ POPULAR_SERVICES = [
 # допы
 NUM_MONTHS_HISTORY = 12
 RANDOM_SEED = 42
+# список всех категорий для фильтрации
+ALL_CATEGORIES = sorted(list(set(MERCHANT_CATEGORIES.values())))
 
 # не являются подписками (даже если частые)
 BLACKLIST_MERCHANTS = [

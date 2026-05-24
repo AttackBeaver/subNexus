@@ -5,6 +5,7 @@ from modules.data_generator import generate_all_users_transactions
 from modules.subscription_detector import detect_subscriptions
 from modules.status_tracker import assign_statuses
 from modules.analytics import total_monthly_cost, top_expensive, simulate_savings, potential_savings
+from config import ALL_CATEGORIES, MERCHANT_CATEGORIES
 
 st.set_page_config(page_title="SubNexus", layout="wide", page_icon="📱")
 
@@ -228,6 +229,8 @@ if 'user_custom_subs' not in st.session_state:
     st.session_state.user_custom_subs = {}
 if 'notifications_sent' not in st.session_state:
     st.session_state.notifications_sent = {}
+if 'user_phone' not in st.session_state:
+    st.session_state.user_phone = {}
 
 
 def load_data(num_users):
@@ -517,7 +520,7 @@ if st.session_state.current_user is None:
 # Страница клиента
 else:
     user_id = st.session_state.current_user
-    col1, col2 = st.columns([6,1])
+    col1, col2 = st.columns([6, 1])
     with col2:
         st.image(image='src/logo_t.png')
     with col1:
@@ -535,6 +538,15 @@ else:
 
     # Видимые подписки
     visible_df = subs_df[~subs_df['merchant_name'].isin(hidden_set)]
+
+    # Получаем список категорий, присутствующих у клиента
+    client_categories = set()
+    for merchant in visible_df['merchant_name'].unique():
+        cat = MERCHANT_CATEGORIES.get(merchant)
+        if cat:
+            client_categories.add(cat)
+    client_categories = sorted(client_categories)
+
     total_visible = total_monthly_cost(visible_df)
     # Автоматические уведомления
     show_auto_notifications(user_id, visible_df, notify_off_set, total_visible)
@@ -581,13 +593,23 @@ else:
                     st.success(f"Подписка {new_name} добавлена!")
                     st.rerun()
 
-    # Фильтры
+    st.subheader("Мои подписки")
+
+    # Фильтр по проблемам
     filter_option = st.radio(
         "Фильтр подписок:",
         ["Все", "Редко используемые", "Дорогие", "Скоро спишут"],
         horizontal=True,
         key="sub_filter"
     )
+
+    # Дополнительный фильтр по категориям (только если есть категории и выбран "Все")
+    selected_category = "Все"
+    if filter_option == "Все" and client_categories:
+        categories = ["Все"] + client_categories
+        selected_category = st.selectbox(
+            "Фильтр по категориям", categories, key="category_filter")
+
     display_df = visible_df.copy()
     if filter_option == "Редко используемые":
         display_df = display_df[display_df['status']
@@ -609,8 +631,14 @@ else:
         display_df = display_df.nlargest(3, 'monthly_cost')
     elif filter_option == "Скоро спишут":
         display_df = display_df[display_df['status'] == "Скоро списание"]
+    elif filter_option == "Все" and selected_category != "Все":
+        # Фильтрация по категориям (только для выбранной категории)
+        merchants_in_cat = [
+            m for m, cat in MERCHANT_CATEGORIES.items() if cat == selected_category]
+        display_df = display_df[display_df['merchant_name'].isin(
+            merchants_in_cat)]
 
-    st.subheader("Мои подписки")
+    st.markdown("---")
     if display_df.empty:
         st.warning("Нет подписок по выбранному фильтру.")
     else:
@@ -739,6 +767,57 @@ else:
                                 f"Если отключить {merchant}, ежемесячные траты снизятся с {total_visible} ₽ до {new_total} ₽ (экономия {total_visible - new_total:.2f} ₽/мес).")
                     st.markdown("</div>", unsafe_allow_html=True)
 
+    # скрытые подписки
+    hidden_subs = subs_df[subs_df['merchant_name'].isin(hidden_set)]
+    if not hidden_subs.empty:
+        with st.expander(f"Скрытые подписки ({len(hidden_subs)})"):
+            for _, row in hidden_subs.iterrows():
+                merchant = row['merchant_name']
+                amount = row['amount']
+                next_date = row['next_payment_date'].strftime('%d.%m.%Y') if pd.notna(
+                    row['next_payment_date']) else "неизвестно"
+                col_h1, col_h2 = st.columns([1, 1])
+                with col_h1:
+                    st.markdown(f"**{merchant}**  \n{amount} ₽ • {next_date}")
+                with col_h2:
+                    if st.button("Восстановить", key=f"restore_{user_id}_{merchant}"):
+                        hidden_set.discard(merchant)
+                        st.session_state.user_hidden[user_id] = hidden_set
+                        st.rerun()
+    else:
+        with st.expander("Скрытые подписки"):
+            st.caption("Нет скрытых подписок")
+
+    # sms-уведы (заглушка)
+    st.markdown("---")
+    st.subheader("SMS-уведомления")
+    st.caption(
+        "Получайте важные уведомления о подписках по SMS (даже без интернета)")
+
+    current_phone = st.session_state.user_phone.get(user_id, "")
+    with st.form(key=f"sms_form_{user_id}"):
+        phone = st.text_input("Номер телефона", value=current_phone,
+                              placeholder="+7 XXX XXX-XX-XX", help="В формате +7XXXXXXXXXX")
+        submitted_sms = st.form_submit_button("Подключить SMS")
+        if submitted_sms:
+            if phone and phone.startswith("+7") and len(phone) >= 10:
+                st.session_state.user_phone[user_id] = phone
+                st.success(
+                    f"✅ Уведомления подключены на номер {phone}. В ближайшее время будут приходить сообщения о скорых списаниях, росте цен и окончании пробных периодов.")
+                st.balloons()
+                st.rerun()
+            else:
+                st.error(
+                    "Введите корректный номер телефона в формате +7XXXXXXXXXX")
+    if current_phone:
+        st.info(
+            f"ℹ️ SMS-уведомления активны для номера {current_phone}. Чтобы отключить, нажмите кнопку ниже.")
+        if st.button("Отключить SMS", key=f"disable_sms_{user_id}"):
+            st.session_state.user_phone.pop(user_id, None)
+            st.success("SMS-уведомления отключены.")
+            st.rerun()
+
+    st.markdown("---")
     # Тестирование уведомлений
     st.subheader("Тестирование уведомлений")
     col1, col2 = st.columns(2)
@@ -776,5 +855,6 @@ else:
             else:
                 st.toast("Лишних подписок не найдено", icon="✅")
 
+    st.markdown("---")
     with st.expander("Все транзакции клиента"):
         st.dataframe(transactions, use_container_width=True, height=300)
