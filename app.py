@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import plotly.express as px
 from datetime import date, timedelta
 from modules.data_generator import generate_all_users_transactions
 from modules.subscription_detector import detect_subscriptions
@@ -384,6 +385,91 @@ def show_auto_notifications(user_id, visible_df, notify_off_set, total_visible):
     st.session_state.notifications_sent[user_id] = sent
 
 
+def get_category_expenses(transactions, subscriptions_df, hidden_set, important_set, simulate_disable=False):
+    """
+    Рассчитывает среднемесячные расходы по категориям.
+    Если simulate_disable=True, исключает подписки со статусом "Возможно не используется"
+    (и не важные) из расходов.
+    Возвращает словарь {категория: сумма_в_месяц}.
+    """
+    from collections import defaultdict
+    expenses = defaultdict(float)
+
+    # Определяем, какие подписки исключить при симуляции
+    excluded_subs = set()
+    if simulate_disable:
+        for _, row in subscriptions_df.iterrows():
+            if row['status'] == "Возможно не используется" and row['merchant_name'] not in important_set:
+                excluded_subs.add(row['merchant_name'])
+
+    # Расходы по подпискам (только видимые, не скрытые)
+    visible_subs = subscriptions_df[~subscriptions_df['merchant_name'].isin(
+        hidden_set)]
+    for _, row in visible_subs.iterrows():
+        if row['merchant_name'] in excluded_subs:
+            continue
+        merchant = row['merchant_name']
+        amount = row['amount']
+        period = row['period_days']
+        # Приводим к месячной стоимости
+        if period == 365:
+            monthly = amount / 12
+        elif period == 7:
+            monthly = amount * (30 / 7)
+        else:
+            monthly = amount
+        category = MERCHANT_CATEGORIES.get(merchant, "Без категории")
+        expenses[category] += monthly
+
+    # Расходы по не-подпискам (шумовые транзакции)
+    # Получаем список всех merchant, которые являются подписками (в исходном subscriptions_df)
+    subscription_merchants = set(subscriptions_df['merchant_name'])
+    non_sub_txs = transactions[~transactions['merchant_name'].isin(
+        subscription_merchants)]
+    if not non_sub_txs.empty:
+        # Вычисляем общую сумму за весь период и делим на количество месяцев (из history)
+        total_non_sub = non_sub_txs['amount'].sum()
+        months = (transactions['date'].max() -
+                  transactions['date'].min()).days / 30
+        if months > 0:
+            avg_monthly_non_sub = total_non_sub / months
+        else:
+            avg_monthly_non_sub = total_non_sub
+        expenses["Прочее (не подписки)"] = avg_monthly_non_sub
+
+    return dict(expenses)
+
+
+def display_expense_chart(expenses, title="Распределение расходов в месяц"):
+    """Создаёт и отображает круговую диаграмму расходов с суммами и процентами."""
+    if not expenses:
+        st.info("Нет данных для построения диаграммы.")
+        return
+    df = pd.DataFrame({
+        'Категория': list(expenses.keys()),
+        'Сумма (₽)': list(expenses.values())
+    })
+    # Создаём подписи: категория, сумма, процент
+    total = df['Сумма (₽)'].sum()
+    df['Процент'] = df['Сумма (₽)'] / total * 100
+    df['Метка'] = df.apply(
+        lambda row: f"{row['Категория']}<br>{row['Сумма (₽)']:.2f} ₽ ({row['Процент']:.1f}%)", axis=1)
+
+    fig = px.pie(df, values='Сумма (₽)', names='Метка', title=title,
+                 color_discrete_sequence=px.colors.qualitative.Set3,
+                 hole=0.3)
+    fig.update_traces(textposition='inside', textinfo='percent+label',
+                      insidetextfont=dict(color='white'))
+    fig.update_layout(
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        font=dict(color='white', size=12),
+        title_font_color='#f8d81c',
+        legend=dict(font=dict(color='white'))
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+
 # Главная страница
 if st.session_state.current_user is None:
     st.image(image='src/logo.png')
@@ -563,6 +649,33 @@ else:
         st.markdown("#### Самые дорогие подписки")
         for t in top:
             st.info(f"**{t['merchant_name']}**: {t['monthly_cost']} ₽/мес")
+
+    with st.expander("📊 Аналитика расходов"):
+        # Расчёты для текущих расходов
+        expenses_current = get_category_expenses(
+            transactions, subs_df, hidden_set, important_set, simulate_disable=False)
+
+        # Отображение текущей диаграммы
+        display_expense_chart(expenses_current, "Текущие расходы в месяц")
+
+        # Кнопка для прогноза
+        if st.button("Если отключите лишние подписки", key="forecast_btn"):
+            expenses_forecast = get_category_expenses(
+                transactions, subs_df, hidden_set, important_set, simulate_disable=True)
+            if expenses_forecast:
+                display_expense_chart(
+                    expenses_forecast, "Прогноз расходов после отключения лишних подписок")
+                # Дополнительно покажем экономию
+                current_total = sum(expenses_current.values())
+                forecast_total = sum(expenses_forecast.values())
+                savings = current_total - forecast_total
+                if savings > 0:
+                    st.success(
+                        f"Потенциальная экономия: **{savings:.2f} ₽/мес**")
+                else:
+                    st.info("Отключение лишних подписок не изменит сумму расходов.")
+            else:
+                st.warning("Нет данных для построения прогноза.")
 
     # Форма ручного добавления подписки
     with st.expander("➕ Добавить подписку вручную"):

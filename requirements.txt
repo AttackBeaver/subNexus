@@ -2,3 +2,4 @@ streamlit
 pandas
 faker
 python-dotenv
+plotly
