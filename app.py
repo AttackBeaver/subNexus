@@ -10,109 +10,152 @@ st.set_page_config(page_title="SubNexus", layout="wide", page_icon="📱")
 
 st.markdown("""
 <style>
+    /* небольшие отступы по краям для мобильных устройств */
     .main { padding: 0.5rem; }
-    /* Карточка клиента */
+
+    /* === КАРТОЧКА КЛИЕНТА === */
     .client-card {
-        background-color: white;
-        border-radius: 24px;
-        padding: 1rem 1.2rem;
-        margin-bottom: 1rem;
-        border: 1px solid #e2e8f0;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-        transition: 0.2s;
+        background-color: #1e1e2a;          /* тёмно-серый фон карточки */
+        border-radius: 24px;                /* закруглённые углы */
+        padding: 1rem 1.2rem;               /* внутренние отступы */
+        margin-bottom: 1rem;                /* отступ между карточками */
+        border: 1px solid #f8d81c;          /* рамка цвета «тёмное золото» */
+        box-shadow: 0 4px 12px rgba(248,216,28,0.2); /* усиленная тень с жёлтым отливом */
+        transition: 0.2s;                   /* плавное изменение при наведении */
     }
-    .client-card:hover {
-        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-        border-color: #cbd5e1;
-    }
-    /* Карточка подписки */
+
+    /* === КАРТОЧКА ПОДПИСКИ === */
     .sub-card {
-        background-color: #ffffff;
+        background-color: #262730;           /* чуть светлее фона карточки клиента */
         border-radius: 16px;
         padding: 0.5rem;
         margin-bottom: 0.6rem;
-        border: 1px solid #e2e8f0;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+        border: 1px solid #f8d81c;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.3);
     }
-    /* Бейджи статусов */
+
+    /* === БЕЙДЖИ СТАТУСОВ ПОДПИСОК === */
     .status-badge {
-        display: inline-block;
+        display: inline-block;               /* чтобы бейджи не разрывали строку */
         padding: 4px 12px;
         border-radius: 30px;
         font-size: 12px;
         font-weight: 500;
-        background-color: #e9ecef;
-        color: #495057;
+        background-color: #3a3a4a;           /* тёмно-серый фон по умолчанию */
+        color: #fafafa;                      /* светлый текст */
     }
-    .status-active { background-color: #d4edda; color: #155724; }
-    .status-upcoming { background-color: #fff3cd; color: #856404; }
-    .status-price-rise { background-color: #f8d7da; color: #721c24; }
-    .status-unused { background-color: #e2e3e5; color: #383d41; }
-    .status-trial { background-color: #d1ecf1; color: #0c5460; }
-    /* Метрики */
+    /* Активна — зелёный оттенок */
+    .status-active { background-color: #1a3a2a; color: #c0e0c0; }
+    /* Скоро списание — жёлтый оттенок (основной цвет бренда) */
+    .status-upcoming { background-color: #5c4a1a; color: #f8d81c; }
+    /* Рост цены — красноватый оттенок */
+    .status-price-rise { background-color: #5a2020; color: #f8b0b0; }
+    /* Возможно не используется — серый */
+    .status-unused { background-color: #3a3a3a; color: #bcb280; }
+    /* Пробный период — голубоватый */
+    .status-trial { background-color: #1a4a5a; color: #a0d8f0; }
+
+    /* === МЕТРИКИ === */
     .metric-card {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: linear-gradient(135deg, #2c3844 0%, #1a2228 100%); /* градиент тёмно-синих оттенков */
         border-radius: 24px;
         padding: 1rem;
-        color: white;
+        color: #f8d81c;                      /* жёлтый текст */
         text-align: center;
         margin-bottom: 1rem;
+        border: 1px solid #8c741a;           /* золотистая рамка */
     }
-    /* Рекомендация внутри карточки */
+
+    /* === РЕКОМЕНДАЦИЯ ВНУТРИ КАРТОЧКИ ПОДПИСКИ === */
     .recommend-inline {
-        background-color: #f8f9fa;
+        background-color: #2a2a36;           /* темнее основного фона карточки */
         border-radius: 14px;
         padding: 0.6rem;
         margin: 0.5rem 0;
         font-size: 0.85rem;
-        border-left: 3px solid #667eea;
+        border-left: 3px solid #f8d81c;      /* жёлтая вертикальная полоска слева */
+        color: #e0e0e0;
     }
-    /* Кнопки в карточках */
+
+    /* === СТАНДАРТНЫЕ КНОПКИ STREAMLIT (везде) === */
     div.stButton > button {
-        background-color: #667eea;
-        color: white;
-        border-radius: 40px;
+        background-color: #f8d81c;           /* основной жёлтый цвет бренда */
+        color: #1e1e2a;                     /* тёмный текст для контраста */
+        border-radius: 40px;                /* сильно закруглённые края */
         border: none;
         font-weight: 500;
         font-size: 0.85rem;
-        width: 100%;
+        width: 100%;                        /* кнопка растягивается на всю ширину колонки */
         transition: 0.1s;
     }
     div.stButton > button:hover {
-        background-color: #5a67d8;
+        background-color: #f8d93e;           /* более светлый жёлтый при наведении */
+        color: #0e1117;                     /* почти чёрный текст */
     }
-    /* Кнопка внутри карточки клиента */
+
+    /* === КНОПКА «ПОДРОБНЕЕ» В КАРТОЧКЕ КЛИЕНТА === */
     .client-card div.stButton > button {
-        background-color: #f1f5f9;
-        color: #475569;
-        border: 1px solid #cbd5e1;
-        width: auto;
+        background-color: #3a3a4a;           /* тёмно-серая, не отвлекает внимание */
+        color: #f8d81c;                     /* жёлтый текст */
+        border: 1px solid #8c741a;          /* золотистая рамка */
+        width: auto;                        /* ширина по содержимому */
         padding: 0.25rem 1rem;
         font-size: 0.8rem;
     }
     .client-card div.stButton > button:hover {
-        background-color: #667eea;
-        color: white;
-        border-color: #667eea;
+        background-color: #f8d81c;           /* при наведении становится жёлтой */
+        color: #1e1e2a;
+        border-color: #f8d81c;
     }
     .client-card div.stButton {
         text-align: center;
         margin: 0;
     }
-    /* Кнопки в карточке подписки */
+
+    /* === КНОПКИ В КАРТОЧКЕ ПОДПИСКИ (⭐, 🔔, 👁️‍🗨️, ⚠️) === */
     .sub-card div.stButton > button {
         padding: 0.3rem;
         font-size: 1rem;
         min-width: 2rem;
+        background-color: #f8d81c;           /* жёлтый фон */
+        color: #1e1e2a;
     }
-    .stRadio > div { flex-direction: row; gap: 0.5rem; }
-    hr { margin: 0.5rem 0; }
-    /* Горизонтальное расположение кнопок в карточке подписки */
+    .sub-card div.stButton > button:hover {
+        background-color: #f8d93e;           /* чуть светлее при наведении */
+    }
+
+    /* === РАДИОКНОПКИ === */
+    .stRadio > div {
+        flex-direction: row;                 /* горизонтальное расположение */
+        gap: 0.5rem;
+    }
+    /* Стили для меток радиокнопок */
+    .stRadio div[role="radiogroup"] label {
+        background-color: #2a2a36;           /* тёмный фон */
+        border-radius: 30px;
+        padding: 4px 12px;
+        margin: 0 4px;
+        color: #fafafa;                     /* светлый текст */
+    }
+    /* Выбранная радиокнопка */
+    .stRadio div[role="radiogroup"] label[data-baseweb="radio"]:checked {
+        background-color: #f8d81c;           /* жёлтый фон для активного элемента */
+        color: #1e1e2a;
+    }
+
+    /* === РАЗДЕЛИТЕЛИ === */
+    hr {
+        margin: 0.5rem 0;
+        border-color: #8c741a;               /* золотистый цвет разделителя */
+    }
+
+    /* === ГОРИЗОНТАЛЬНОЕ РАСПОЛОЖЕНИЕ КНОПОК В КАРТОЧКЕ ПОДПИСКИ === */
     .sub-card .stButton {
         display: inline-block;
         width: auto;
         margin-right: 4px;
     }
+    /* Контейнер, содержащий кнопки, превращаем в flex-строку */
     .sub-card div:has(> div.stButton) {
         display: flex;
         flex-wrap: nowrap;
@@ -124,7 +167,8 @@ st.markdown("""
         min-width: 2.5rem;
         padding: 0.3rem 0.5rem;
     }
-    /* Принудительное горизонтальное расположение кнопок */
+
+    /* === ПРИНУДИТЕЛЬНОЕ ГОРИЗОНТАЛЬНОЕ РАСПОЛОЖЕНИЕ КОЛОНОК STREAMLIT === */
     .stHorizontalBlock {
         gap: 1 !important;
     }
@@ -132,6 +176,32 @@ st.markdown("""
         flex: 1 1 auto !important;
         min-width: 0 !important;
         padding: 0 2px !important;
+    }
+
+    /* === ЗАГОЛОВКИ И ТЕКСТ === */
+    h1, .stMarkdown h1{
+        color: #f8d81c;                     /* желтый */
+    }
+    h2, h3, h4, .stMarkdown h2, .stMarkdown h3 {
+        color: #FFFFFF;                     /* белый */
+    }
+    .stCaption, .stMarkdown, .stText, stTitle{
+        color: #f8d81c;                     /* желтый */
+    }
+
+    /* === МЕТРИКИ STREAMLIT === */
+    div[data-testid="stMetricValue"] {
+        color: #FFFFFF;                     /* значение метрики белое */
+    }
+    div[data-testid="stMetricDelta"] {
+        color: #f8d81c;                     /* дельта метрики желтая */
+    }
+
+    /* === ВСПЛЫВАЮЩИЕ ОКНА (info, success, warning, error) === */
+    .stInfo, .stSuccess, .stWarning, .stError {
+        background-color: #2a2a36;          /* тёмный фон */
+        border-color: #8c741a;              /* золотистая рамка */
+        color: #fafafa;                     /* светлый текст */
     }
 </style>
 """, unsafe_allow_html=True)
