@@ -884,7 +884,7 @@ else:
     hidden_subs = subs_df[subs_df['merchant_name'].isin(hidden_set)]
     if not hidden_subs.empty:
         with st.expander(f"Скрытые подписки ({len(hidden_subs)})"):
-            for _, row in hidden_subs.iterrows():
+            for hidx, row in hidden_subs.iterrows():
                 merchant = row['merchant_name']
                 amount = row['amount']
                 next_date = row['next_payment_date'].strftime('%d.%m.%Y') if pd.notna(
@@ -893,7 +893,7 @@ else:
                 with col_h1:
                     st.markdown(f"**{merchant}**  \n{amount} ₽ • {next_date}")
                 with col_h2:
-                    if st.button("Восстановить", key=f"restore_{user_id}_{merchant}"):
+                    if st.button("Восстановить", key=f"restore_{user_id}_{merchant}_{hidx}"):
                         hidden_set.discard(merchant)
                         st.session_state.user_hidden[user_id] = hidden_set
                         st.rerun()
