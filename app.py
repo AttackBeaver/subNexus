@@ -5,7 +5,7 @@ from modules.data_generator import generate_all_users_transactions
 from modules.subscription_detector import detect_subscriptions
 from modules.status_tracker import assign_statuses
 from modules.analytics import total_monthly_cost, top_expensive, simulate_savings, potential_savings
-from config import ALL_CATEGORIES, MERCHANT_CATEGORIES
+from config import MERCHANT_CATEGORIES
 
 st.set_page_config(page_title="SubNexus", layout="wide", page_icon="📱")
 
