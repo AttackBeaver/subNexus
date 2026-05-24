@@ -517,9 +517,13 @@ if st.session_state.current_user is None:
 # Страница клиента
 else:
     user_id = st.session_state.current_user
-    if st.button("← Назад к списку клиентов", use_container_width=False):
-        back_to_list()
-        st.rerun()
+    col1, col2 = st.columns([6,1])
+    with col2:
+        st.image(image='src/logo_t.png')
+    with col1:
+        if st.button("← Назад к списку клиентов", use_container_width=False):
+            back_to_list()
+            st.rerun()
 
     st.header(f"👤 Клиент {user_id}")
 
